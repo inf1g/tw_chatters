@@ -66,7 +66,7 @@ class TwitchChatLogger:
 
         tk.Label(self.root, text="🔹 Имя канала :", bg="#f0f0f0", font=("Arial", 10)).pack(pady=(10, 0))
         self.channel_entry = tk.Entry(self.root, font=("Arial", 12), width=30)
-        self.channel_entry.insert(0, "inf_ru")
+        self.channel_entry.insert(0, "Streamers")
         self.channel_entry.pack(pady=5)
 
         self.check_btn = tk.Button(self.root, text="🔍 Проверить канал", command=self.check_channel,
