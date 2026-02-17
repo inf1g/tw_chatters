@@ -177,3 +177,6 @@ cython_debug/
 #.idea/
 
 /logs/
+*.py
+!main.py
+
