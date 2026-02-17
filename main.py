@@ -13,8 +13,6 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 
-
-
 def resource_path(rel: str) -> Path:
     base = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(__file__).parent
     return base / rel
@@ -22,6 +20,17 @@ def resource_path(rel: str) -> Path:
 
 def load_twitch_credentials(key_id, key_access):
     return os.getenv(key_id), os.getenv(key_access)
+
+
+def open_text_file():
+    logs_dir = Path("logs")
+    chatters_dir = logs_dir / "Chatters"
+    result_table_file = chatters_dir / "result_table.txt"
+    path = Path(result_table_file)
+    if not path.exists():
+        raise FileNotFoundError(path)
+    if sys.platform.startswith("win"):
+        os.startfile(str(path))
 
 
 class TwitchChatLogger:
@@ -38,7 +47,6 @@ class TwitchChatLogger:
         self.access_token = ACCESS_TOKEN
         self.log_file = None
         self.logger = self.setup_logger()
-
         self.create_widgets()
 
     def setup_logger(self):
@@ -68,10 +76,8 @@ class TwitchChatLogger:
         self.status_label = tk.Label(self.root, text="⏳ Статус: Не авторизован", bg="#f0f0f0", fg="orange",
                                      font=("Arial", 10))
         self.status_label.pack(pady=5)
-
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
         btn_frame.pack(pady=10)
-
         self.start_btn = tk.Button(btn_frame, text="▶️ Запустить мониторинг", command=self.start_monitoring,
                                    bg="#2ecc71", fg="white", font=("Arial", 10), padx=10, pady=5, state="disabled")
         self.start_btn.grid(row=0, column=0, padx=5)
@@ -83,7 +89,6 @@ class TwitchChatLogger:
         self.sort_btn = tk.Button(self.root, text="📊 Сортировать логи", command=self.sort_logs,
                                   bg="#9b59b6", fg="white", font=("Arial", 11), padx=15, pady=5)
         self.sort_btn.pack(pady=8)
-
         tk.Label(self.root, text="📋 Лог входа/выхода:", bg="#f0f0f0", font=("Arial", 10)).pack(pady=(10, 0))
         self.log_text = scrolledtext.ScrolledText(self.root, font=("Consolas", 9), height=12, wrap=tk.WORD,
                                                   state="disabled")
@@ -96,12 +101,10 @@ class TwitchChatLogger:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         full_message = f"[{timestamp}] {message}"
         print(full_message)
-
         self.log_text.config(state="normal")
         self.log_text.insert(tk.END, full_message + "\n")
         self.log_text.see(tk.END)
         self.log_text.config(state="disabled")
-
         if self.log_file:
             try:
                 with open(self.log_file, "a", encoding="utf-8") as f:
@@ -118,7 +121,6 @@ class TwitchChatLogger:
             f"scope={SCOPE}"
         )
         webbrowser.open(auth_url)
-
         messagebox.showinfo("Инструкция",
                             "1. Войдите в Twitch под нужным аккаунтом\n"
                             "2. Разрешите доступ\n"
@@ -141,7 +143,6 @@ class TwitchChatLogger:
         url = "https://api.twitch.tv/helix/users"
         headers = {"Client-ID": CLIENT_ID, "Authorization": f"Bearer {self.access_token}"}
         params = {"login": channel_name}
-
         try:
             response = requests.get(url, headers=headers, params=params)
             response.raise_for_status()
@@ -171,12 +172,10 @@ class TwitchChatLogger:
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
         self.status_label.config(text="📡 Мониторинг запущен...", fg="blue")
-
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.log_file = f"logs/chatters_log_{timestamp}.txt"
         self.file_label.config(text=f"📁 Лог-файл: {self.log_file}")
         self.log(f"📝 Лог-файл создан: {self.log_file}")
-
         threading.Thread(target=self.monitor_chat, daemon=True).start()
 
     def stop_monitoring(self):
@@ -197,11 +196,9 @@ class TwitchChatLogger:
                 newcomers = current_chatters - self.previous_chatters
                 for user in newcomers:
                     self.log(f"🟢 [ВХОД] Пользователь '{user}' зашёл в чат")
-
                 leavers = self.previous_chatters - current_chatters
                 for user in leavers:
                     self.log(f"🔴 [ВЫХОД] Пользователь '{user}' вышел из чата")
-
                 self.previous_chatters = current_chatters
                 time.sleep(10)
             except Exception as e:
@@ -215,7 +212,6 @@ class TwitchChatLogger:
             "broadcaster_id": self.broadcaster_id,
             "moderator_id": self.broadcaster_id
         }
-
         try:
             response = requests.get(url, headers=headers, params=params)
             if response.status_code == 200:
@@ -255,12 +251,10 @@ class TwitchChatLogger:
                 except Exception as e:
                     self.logger.exception("Ошибка при обработке файла %s", log_file)
                     self.log(f"⚠️ Ошибка обработки {log_file.name}: {e}")
-
             self.log(f"📁 Обработано файлов: {processed_count}")
             self.get_table_stats(chatters_file)
-            self.open_text_file()
+            open_text_file()
             self.log("✅ Сортировка завершена!")
-
         except Exception as e:
             self.logger.exception("Ошибка при сортировке логов")
             self.log(f"❌ Ошибка сортировки: {e}")
@@ -273,7 +267,6 @@ class TwitchChatLogger:
         except Exception as e:
             self.log(f"⚠️ Ошибка чтения файла {log_file}: {e}")
             return
-
         pattern_entry = re.compile(
             r"\[(?P<ts>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\].*?\[ВХОД\].*?['\"](?P<user>[^'\"]+)['\"]",
             flags=re.IGNORECASE | re.UNICODE
@@ -304,7 +297,6 @@ class TwitchChatLogger:
                     exits[user] = ts
                 except Exception:
                     continue
-
         stats = {}
         for user, ts in entries:
             day = ts.date()
@@ -346,7 +338,6 @@ class TwitchChatLogger:
                 "Последний заход dt": last_dt,
                 "Длительность": duration
             })
-
         rows_with_dt.sort(key=lambda r: r["Последний заход dt"], reverse=True)
         rows = [
             {
@@ -358,7 +349,7 @@ class TwitchChatLogger:
             }
             for r in rows_with_dt
         ]
-
+        
         def build_ascii_table(rows):
             headers = ["Ник", "Потоков", "Первый заход", "Последний заход", "Длительность"]
             col_widths = {h: len(h) for h in headers}
@@ -376,37 +367,21 @@ class TwitchChatLogger:
                     s = str(v)
                     parts.append("| " + s + " " * (col_widths[h] - len(s)) + " ")
                 return "".join(parts) + "|\n"
-
-            sb = []
-            sb.append(sep_line())
-            sb.append(format_row(headers))
-            sb.append(sep_line())
+            result_table = []
+            result_table.append(sep_line())
+            result_table.append(format_row(headers))
+            result_table.append(sep_line())
             for row in rows:
-                sb.append(format_row([row.get(h, "") for h in headers]))
-            sb.append(sep_line())
-            return "".join(sb)
-
+                result_table.append(format_row([row.get(h, "") for h in headers]))
+            result_table.append(sep_line())
+            return "".join(result_table)
         if not rows:
             table_str = "Нет найденных заходов — таблица пуста.\n"
         else:
             table_str = build_ascii_table(rows)
-
         result_table_file = chatters_dir / "result_table.txt"
         result_table_file.write_text(table_str, encoding="utf-8")
         self.log(f"📊 Таблица создана: {Path.cwd()}{result_table_file}")
-
-
-    def open_text_file(self):
-        logs_dir = Path("logs")
-        chatters_dir = logs_dir / "Chatters"
-        result_table_file = chatters_dir / "result_table.txt"
-        path = Path(result_table_file)
-        if not path.exists():
-            raise FileNotFoundError(path)
-
-        if sys.platform.startswith("win"):
-            os.startfile(str(path))
-
 
     def on_closing(self):
         if self.is_monitoring:
