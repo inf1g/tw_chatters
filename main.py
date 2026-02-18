@@ -8,6 +8,7 @@ import re
 import logging
 import os
 import sys
+import json
 from tkinter import messagebox, scrolledtext, simpledialog
 from dotenv import load_dotenv
 from pathlib import Path
@@ -35,6 +36,20 @@ def open_text_file():
         print("Файл готов:", path)
 
 
+def load_settings():
+    if settings.exists():
+        try:
+            return json.loads(settings.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pass
+    return {}
+
+
+def save_settings(data: dict):
+    settings.write_text(json.dumps(data, ensure_ascii=False, indent=2),
+                        encoding="utf-8")
+
+
 class TwitchChatLogger:
     def __init__(self, root):
         self.root = root
@@ -48,8 +63,10 @@ class TwitchChatLogger:
         self.previous_chatters = set()
         self.access_token = ACCESS_TOKEN
         self.log_file = None
+        self.entries: dict[str, datetime.datetime] = {}
         self.logger = self.setup_logger()
         self.create_widgets()
+        self._restore_fields()
 
     def setup_logger(self):
         logger = logging.getLogger(__name__)
@@ -68,7 +85,7 @@ class TwitchChatLogger:
 
         tk.Label(self.root, text="🔹 Имя канала :", bg="#f0f0f0", font=("Arial", 10)).pack(pady=(10, 0))
         self.channel_entry = tk.Entry(self.root, font=("Arial", 12), width=30)
-        self.channel_entry.insert(0, "Streamers")
+        #self.channel_entry.insert(0, "Streamer")
         self.channel_entry.pack(pady=5)
 
         self.check_btn = tk.Button(self.root, text="🔍 Проверить канал", command=self.check_channel,
@@ -98,6 +115,11 @@ class TwitchChatLogger:
 
         self.file_label = tk.Label(self.root, text="📁 Лог-файл: не создан", bg="#f0f0f0", fg="blue", font=("Arial", 9))
         self.file_label.pack(pady=(5, 10))
+
+    def _restore_fields(self):
+        settings = load_settings()
+        self.channel_entry.insert(0, settings.get("channel", "Streamer"))
+
 
     def log(self, message):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -187,7 +209,6 @@ class TwitchChatLogger:
         self.status_label.config(text="⏸️ Мониторинг остановлен", fg="orange")
         stop_logging = "1"
         self.get_table_stats(chatters_file, stop_logging)
-
         self.log("🛑 Мониторинг остановлен пользователем.")
 
     def monitor_chat(self):
@@ -201,10 +222,30 @@ class TwitchChatLogger:
                 newcomers = current_chatters - self.previous_chatters
                 for user in newcomers:
                     self.log(f"🟢 [ВХОД] Пользователь '{user}' зашёл в чат")
+                    def bg_timer(u=user):
+                        while True:
+                            time.sleep(30)
+                            with threading.Lock():
+                                if u not in self.entries:  # уже вышел
+                                    break
+                                dur = datetime.datetime.now() - self.entries[u]
+                            self.log(f"[{datetime.datetime.now():%H:%M:%S}] {u} всё ещё онлайн {dur}")
+
+                    t = threading.Thread(target=bg_timer, daemon=True)
+                    t.start()
+                    _timer_threads[user] = t
                 leavers = self.previous_chatters - current_chatters
                 for user in leavers:
                     self.log(f"🔴 [ВЫХОД] Пользователь '{user}' вышел из чата")
+                    _timer_threads.pop(user, None)
                 self.previous_chatters = current_chatters
+                # фиксируем время захода новичков
+                for u in newcomers:
+                    self.entries[u] = datetime.datetime.now()
+                # удаляем ушедших
+                for u in leavers:
+                    self.entries.pop(u, None)
+
                 time.sleep(10)
             except Exception as e:
                 self.log(f"⚠️ Ошибка мониторинга: {e}")
@@ -360,7 +401,7 @@ class TwitchChatLogger:
             }
             for r in rows_with_dt
         ]
-        
+
         def build_ascii_table(rows):
             headers = ["Ник", "Потоков", "Первый заход", "Последний заход", "Длительность"]
             col_widths = {h: len(h) for h in headers}
@@ -397,11 +438,16 @@ class TwitchChatLogger:
     def on_closing(self):
         if self.is_monitoring:
             self.stop_monitoring()
+        save_settings({
+            "channel": self.channel_entry.get().strip()
+        })
         self.root.destroy()
 
 
 if __name__ == "__main__":
     version = "0.1.8"
+    settings = Path("settings.json")
+    _timer_threads: dict[str, threading.Thread] = {}
     load_dotenv(resource_path('.env'))
     os.makedirs(f"logs", exist_ok=True)
     logs_dir = Path("logs")
