@@ -185,8 +185,8 @@ class TwitchChatLogger:
         self.start_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
         self.status_label.config(text="⏸️ Мониторинг остановлен", fg="orange")
-        stop_loging = "1"
-        self.get_table_stats(chatters_file, stop_loging)
+        stop_logging = "1"
+        self.get_table_stats(chatters_file, stop_logging)
 
         self.log("🛑 Мониторинг остановлен пользователем.")
 
@@ -265,7 +265,8 @@ class TwitchChatLogger:
             self.log(f"❌ Ошибка сортировки: {e}")
             messagebox.showerror("Ошибка", f"Ошибка при сортировке: {e}")
 
-    def get_table_stats(self, log_file,stop_loging=None):
+    def get_table_stats(self, log_file,stop_logging
+    =None):
         chatters_dir = log_file.parent
         try:
             log_text = log_file.read_text(encoding="utf-8")
@@ -302,7 +303,7 @@ class TwitchChatLogger:
                     exits[user] = ts
                 except Exception:
                     continue
-            if stop_loging:
+            if stop_logging:
                 now = datetime.datetime.now()
                 for user, _ in entries:
                     if user not in exits:
