@@ -343,7 +343,7 @@ class TwitchChatLogger:
             duration = format_duration(last_dt, exit_dt)
             rows_with_dt.append({
                 "Ник": user,
-                "Потоков": str(days_count),
+                "Посещений": str(days_count),
                 "Первый заход": first_str,
                 "Последний заход str": last_str,
                 "Последний заход dt": last_dt,
@@ -353,7 +353,7 @@ class TwitchChatLogger:
         rows = [
             {
                 "Ник": r["Ник"],
-                "Потоков": r["Потоков"],
+                "Посещений": r["Посещений"],
                 "Первый заход": r["Первый заход"],
                 "Последний заход": r["Последний заход str"],
                 "Длительность": r["Длительность"]
