@@ -31,6 +31,8 @@ def open_text_file():
         raise FileNotFoundError(path)
     if sys.platform.startswith("win"):
         os.startfile(str(path))
+    else:
+        print("Файл готов:", path)
 
 
 class TwitchChatLogger:
@@ -183,6 +185,9 @@ class TwitchChatLogger:
         self.start_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
         self.status_label.config(text="⏸️ Мониторинг остановлен", fg="orange")
+        stop_loging = "1"
+        self.get_table_stats(chatters_file, stop_loging)
+
         self.log("🛑 Мониторинг остановлен пользователем.")
 
     def monitor_chat(self):
@@ -260,7 +265,7 @@ class TwitchChatLogger:
             self.log(f"❌ Ошибка сортировки: {e}")
             messagebox.showerror("Ошибка", f"Ошибка при сортировке: {e}")
 
-    def get_table_stats(self, log_file):
+    def get_table_stats(self, log_file,stop_loging=None):
         chatters_dir = log_file.parent
         try:
             log_text = log_file.read_text(encoding="utf-8")
@@ -297,6 +302,11 @@ class TwitchChatLogger:
                     exits[user] = ts
                 except Exception:
                     continue
+            if stop_loging:
+                now = datetime.datetime.now()
+                for user, _ in entries:
+                    if user not in exits:
+                        exits[user] = now
         stats = {}
         for user, ts in entries:
             day = ts.date()
