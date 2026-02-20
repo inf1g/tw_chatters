@@ -180,3 +180,4 @@ cython_debug/
 *.py
 !main.py
 
+/settings.json
