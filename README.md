@@ -21,26 +21,28 @@ Analytics Tool. Нажмите кнопку ***Создать***.
 ```bash
 twitch_id=0123456789abcdefg
 ```
-3. Можно упаковать в один .exe файл для удобства
+3. Запустите скрипт ```main.py``` В окне программы нажмите **Авторизоваться в Twitch** и следуйте инструкциям в подсказках.
+ Полученный *access_token* сохраните в файл **.env**, замените 0123456789abcdefgh на свой токен. Это сохранит авторизацию программы.
+```bash
+twitch_user_token=0123456789abcdefg
+```
+4. Можно упаковать в один .exe файл для удобства
 ```bash
 pyinstaller --onefile -n TwitchChatLogger main.py
 ```
-4. Откройте получившийся файл TwitchChatLogger.spec и добавьте строчку datas в a = Analysis:
+5. Откройте получившийся файл TwitchChatLogger.spec и добавьте строчку datas в a = Analysis:
 ```bash
 datas=[('.env', '.')],
 ```
-5. Поставьте в TwitchChatLogger.spec "console=False", если хотите убрать консоль при запуске exe.
+6. Поставьте в TwitchChatLogger.spec "console=False", если хотите убрать консоль при запуске exe.
 ```bash
 console=False
 ```
-6. Для работы obs_data.json и всех .html файлов — не размещайте их локально (через file://), а используйте веб-сервер, что бы путь был вида: http://localhost/online_and_chatters.html
-
 ## Запуск
 1. Запустите скрипт 'main.py' или ***TwitchChatLogger.exe*** из папки ***dist*** в каталоге скрипта.
 ```bash
 python main.py
 ```
-2. Нажмите Авторизоваться в Twitch и следуйте инструкциям в подсказках.
 ## Создано с помощью 
 
 ![Static Badge](https://img.shields.io/badge/Python-3.12-blue?style=flat-square)

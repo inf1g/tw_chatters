@@ -7,11 +7,14 @@ import webbrowser
 import logging
 import os
 import sys
+import http.server
+import socketserver
 import tkinter.ttk as tk_ttk
 from datetime import datetime, timedelta
 from tkinter import messagebox, scrolledtext, simpledialog
 from dotenv import load_dotenv
 from pathlib import Path
+from functools import partial
 
 chatters_file = None
 settings_file = None
@@ -20,7 +23,7 @@ CLIENT_ID = None
 ACCESS_TOKEN = None
 REDIRECT_URI = "http://localhost:3000"
 SCOPE = "moderator:read:chatters"
-version = "0.5.0"
+version = "0.5.1"
 
 
 def parse_duration(duration_str):
@@ -159,6 +162,15 @@ class TwitchChatLogger:
         self.create_widgets()
         self.restore_fields()
 
+
+    def web_server(self):
+        port = 8000
+        obs_dir_str = str(self.obs_dir)
+        handler = partial(http.server.SimpleHTTPRequestHandler, directory=obs_dir_str)
+        with socketserver.TCPServer(("", port), handler) as httpd:
+            httpd.serve_forever()
+
+
     def setup_logger(self):
         logger = logging.getLogger(__name__)
         logging.basicConfig(
@@ -224,6 +236,7 @@ class TwitchChatLogger:
 
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
         btn_frame.pack(pady=10)
+
         self.start_btn = tk.Button(
             btn_frame,
             text="▶️ Запустить мониторинг",
@@ -249,6 +262,20 @@ class TwitchChatLogger:
             state="disabled"
         )
         self.stop_btn.grid(row=0, column=1, padx=5)
+
+        self.open_browser_btn = tk.Button(
+            self.root,
+            text="🌐 Открыть в браузере",
+            command=self.web_server_files,
+            bg="#204760",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            padx=15,
+            pady=8,
+            state="disabled"  # Отключена до запуска сервера
+        )
+        self.open_browser_btn.pack(pady=(10, 5))
+
 
         self.stats_btn = tk.Button(
             self.root,
@@ -367,6 +394,10 @@ class TwitchChatLogger:
         else:
             subprocess.run(['xdg-open', self.obs_dir])
 
+    def web_server_files(self):
+        auth_url = ("http://localhost:8000/")
+        webbrowser.open(auth_url)
+
     def auth_via_browser(self):
         auth_url = (
             f"https://id.twitch.tv/oauth2/authorize?"
@@ -438,14 +469,17 @@ class TwitchChatLogger:
         self.is_monitoring = True
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
+        self.open_browser_btn.config(state="normal")
         self.status_label.config(text="📡 Мониторинг запущен...", fg="blue")
         self.log_file = settings_dir / "chatters_log.txt"
         self.file_label.config(text=f"📁 JSON файл: {chatters_file}")
         self.log(f"📝 Лог-файл создан: {self.log_file}")
         self.log(f"📊 JSON статистика: {chatters_file}")
         self.log(f"📺 OBS файлы: {self.obs_dir}")
+        self.log(f"📺 WEB для OBS: http://localhost:8000/")
         self.update_obs_files(set(), None)
         self.create_obs_html_files()
+        threading.Thread(target=self.web_server, daemon=True).start()
         threading.Thread(target=self.monitor_chat, daemon=True).start()
 
     def stop_monitoring(self):
@@ -1200,7 +1234,7 @@ class TwitchChatLogger:
         close_btn = tk.Button(
             btn_frame,
             text="❌ Закрыть",
-            command=stats_window.destroy,
+            command=self.web_server_files,
             bg="#e74c3c",
             fg="white",
             font=("Arial", 9),
