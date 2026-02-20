@@ -33,6 +33,8 @@ datas=[('.env', '.')],
 ```bash
 console=False
 ```
+6. Для работы obs_data.json и всех .html файлов — не размещайте их локально (через file://), а используйте веб-сервер, что бы путь был вида: http://localhost/online_and_chatters.html
+
 ## Запуск
 1. Запустите скрипт 'main.py' или ***TwitchChatLogger.exe*** из папки ***dist*** в каталоге скрипта.
 ```bash
