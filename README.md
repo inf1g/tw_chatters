@@ -1,9 +1,3 @@
-pyinstaller --onefile -n TwitchChatLogger main.py
-
-Откройте получившийся файл TwitchChatLogger.spec и добавьте строчку datas:
-
-pyinstaller TwitchChatLogger.spec --clean
-
 ## Скрипт показывает пользователей в чате twitch
 
 Пишет логи в .json и собирает статистику просмотров чата.
