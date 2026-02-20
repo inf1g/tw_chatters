@@ -38,6 +38,10 @@ datas=[('.env', '.')],
 ```bash
 console=False
 ```
+7. Сборка в .exe файл
+```bash
+pyinstaller --noconfirm TwitchChatLogger.spec 
+```
 ## Запуск
 1. Запустите скрипт 'main.py' или ***TwitchChatLogger.exe*** из папки ***dist*** в каталоге скрипта.
 ```bash

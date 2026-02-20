@@ -6,10 +6,12 @@ import json
 import webbrowser
 import logging
 import os
-import sys
 import http.server
 import socketserver
+import sys
+import traceback
 import tkinter.ttk as tk_ttk
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from tkinter import messagebox, scrolledtext, simpledialog
 from dotenv import load_dotenv
@@ -23,7 +25,7 @@ CLIENT_ID = None
 ACCESS_TOKEN = None
 REDIRECT_URI = "http://localhost:3000"
 SCOPE = "moderator:read:chatters"
-version = "0.5.1"
+version = "0.5.4"
 
 
 def parse_duration(duration_str):
@@ -142,6 +144,39 @@ def load_twitch_credentials(key_id, key_access):
     return os.getenv(key_id), os.getenv(key_access)
 
 
+@contextmanager
+def redirect_stdout_stderr_to_file(log_path):
+    log_path = Path(log_path)
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+    orig_stdout = sys.stdout
+    orig_stderr = sys.stderr
+    f = None
+    try:
+        f = open(str(log_path), "a", encoding="utf-8")
+        sys.stdout = f
+        sys.stderr = f
+        yield
+    except Exception:
+        try:
+            orig_stderr.write("Failed to redirect stdout/stderr:\n")
+            orig_stderr.write(traceback.format_exc() + "\n")
+        except Exception:
+            pass
+        yield
+    finally:
+        try:
+            if f:
+                f.flush()
+                f.close()
+        except Exception:
+            pass
+        sys.stdout = orig_stdout
+        sys.stderr = orig_stderr
+
 class TwitchChatLogger:
     def __init__(self, root):
         self.root = root
@@ -161,15 +196,41 @@ class TwitchChatLogger:
         self.obs_data_file = self.obs_dir / "obs_data.json"
         self.create_widgets()
         self.restore_fields()
+        self.clear_server_logs()
 
+    def clear_server_logs(self):
+        try:
+            obs_dir = self.obs_dir
+            log_filename = "web_server.log"
+            log_file = obs_dir / log_filename
+            os.remove(log_file)
+        except Exception as e:
+            pass
 
     def web_server(self):
+        obs_dir = str(self.obs_dir)
         port = 8000
-        obs_dir_str = str(self.obs_dir)
+        obs_dir = Path(obs_dir)
+        obs_dir_str = str(obs_dir)
+        log_filename = "web_server.log"
+        log_file = obs_dir / log_filename
         handler = partial(http.server.SimpleHTTPRequestHandler, directory=obs_dir_str)
-        with socketserver.TCPServer(("", port), handler) as httpd:
-            httpd.serve_forever()
-
+        with redirect_stdout_stderr_to_file(log_file):
+            try:
+                print(f"Веб-сервер: раздаёт {obs_dir_str} на порту {port}")
+                with socketserver.TCPServer(("", port), handler) as httpd:
+                    print(f"Сервер запущен на порту {port}, лог: {log_file}")
+                    try:
+                        httpd.serve_forever()
+                    except KeyboardInterrupt:
+                        print("Остановка сервера по KeyboardInterrupt")
+                    finally:
+                        try:
+                            httpd.server_close()
+                        except Exception:
+                            traceback.print_exc()
+            except Exception:
+                traceback.print_exc()
 
     def setup_logger(self):
         logger = logging.getLogger(__name__)
@@ -471,7 +532,6 @@ class TwitchChatLogger:
         self.stop_btn.config(state="normal")
         self.open_browser_btn.config(state="normal")
         self.status_label.config(text="📡 Мониторинг запущен...", fg="blue")
-        self.log_file = settings_dir / "chatters_log.txt"
         self.file_label.config(text=f"📁 JSON файл: {chatters_file}")
         self.log(f"📝 Лог-файл создан: {self.log_file}")
         self.log(f"📊 JSON статистика: {chatters_file}")
@@ -1272,7 +1332,6 @@ def main():
     app = TwitchChatLogger(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
-
 
 if __name__ == "__main__":
     import tkinter.ttk as tk_ttk
