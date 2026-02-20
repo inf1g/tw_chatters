@@ -14,6 +14,7 @@ pip install -r requirements.txt
 python main.py
 ```
 ## Настройка
+***У вас должны быть права модератора на канале стримера***
 1. Авторизируйтесь или зарегистрируйтесь на https://dev.twitch.tv/console, затем нажмите [Подать заявку](https://dev.twitch.tv/console/apps/create) и заполните поля - ***Название***: укажите имя бота, ***OAuth Redirect URL***: http://localhost:3000, **Категория**:
 Analytics Tool. Нажмите кнопку ***Создать***.
 
