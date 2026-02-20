@@ -33,11 +33,11 @@ pyinstaller --onefile -n TwitchChatLogger main.py
 ```
 4. Откройте получившийся файл TwitchChatLogger.spec и добавьте строчку datas в a = Analysis:
 ```bash
-    datas=[('.env', '.')],
+datas=[('.env', '.')],
 ```
 5. Поставьте в TwitchChatLogger.spec "console=False", если хотите убрать консоль при запуске exe.
 ```bash
-    console=False
+console=False
 ```
 ## Запуск
 1. Запустите скрипт 'main.py' или ***TwitchChatLogger.exe*** из папки ***dist*** в каталоге скрипта.
