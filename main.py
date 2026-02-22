@@ -25,7 +25,12 @@ CLIENT_ID = None
 ACCESS_TOKEN = None
 REDIRECT_URI = "http://localhost:3000"
 SCOPE = "moderator:read:chatters"
-version = "0.5.4"
+BOTS_TO_IGNORE = {'moobot', 'nightbot', 'streamelements', 'streamlabs', 'wizebot'}
+version = "0.5.5"
+
+
+def should_ignore_user(username: str) -> bool:
+    return username.lower() in {bot.lower() for bot in BOTS_TO_IGNORE}
 
 
 def parse_duration(duration_str):
@@ -64,6 +69,8 @@ def save_chatters_data(data):
 
 
 def update_chatter(username: str, event_type: str, entry_time: datetime = None):
+    if should_ignore_user(username):
+        return load_chatters_data()
     data = load_chatters_data()
     now = datetime.now()
     now_str = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -99,6 +106,7 @@ def update_chatter(username: str, event_type: str, entry_time: datetime = None):
 
 
 def update_all_online_users(usernames: set):
+    usernames = {user for user in usernames if not should_ignore_user(user)}
     data = load_chatters_data()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -121,7 +129,9 @@ def update_all_online_users(usernames: set):
 def load_settings() -> dict:
     if settings_file and settings_file.exists():
         try:
-            return json.loads(settings_file.read_text(encoding="utf-8"))
+            settings = json.loads(settings_file.read_text(encoding="utf-8"))
+            BOTS_TO_IGNORE.update(settings.get("ignored_bots", []))
+            return settings
         except json.JSONDecodeError:
             pass
     return {}
@@ -333,7 +343,7 @@ class TwitchChatLogger:
             font=("Arial", 10, "bold"),
             padx=15,
             pady=8,
-            state="disabled"  # Отключена до запуска сервера
+            state="disabled"
         )
         self.open_browser_btn.pack(pady=(10, 5))
 
@@ -569,16 +579,12 @@ class TwitchChatLogger:
         try:
             time.sleep(10)
             response = requests.get(url, headers=headers, params=params)
-            # self.log(f"📡 API ответ: {response.status_code}")
             response.raise_for_status()
             data = response.json()
             chatters_data = data.get("data", [])
-            pagination = data.get("pagination", {})
-            # self.log(f"📥 Получено {len(chatters_data)} чаттеров из API")
             if chatters_data:
                 chatters = {chatter["user_login"] for chatter in chatters_data}
-                # self.log(f"✅ Уникальных чаттеров: {len(chatters)}")
-                return chatters
+                return {user for user in chatters if not should_ignore_user(user)}
             else:
                 self.log("⚠️ API вернул пустой список чаттеров")
                 return set()
@@ -639,14 +645,12 @@ class TwitchChatLogger:
             return None
 
     def create_obs_html_files(self):
-        # Путь к JSON (используем полный путь для надежности)
-        # json_path = self.obs_data_file.as_posix().replace('/', '/')
         # === HTML для счетчика зрителей ===
         viewers_html = f'''<!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
-        <meta http-equiv="refresh" content="2">
+        <meta http-equiv="refresh" content="30">
         <style>
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
             body {{
@@ -730,7 +734,7 @@ class TwitchChatLogger:
     <html>
     <head>
         <meta charset="UTF-8">
-        <meta http-equiv="refresh" content="3">
+        <meta http-equiv="refresh" content="30">
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body {
@@ -851,7 +855,7 @@ class TwitchChatLogger:
     <html>
     <head>
         <meta charset="UTF-8">
-        <meta http-equiv="refresh" content="10">
+        <meta http-equiv="refresh" content="30">
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body {
@@ -953,85 +957,84 @@ class TwitchChatLogger:
     </html>'''
         # === HTML FULLOVERLAY ===
         online_and_chatters_html = '''<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta http-equiv="refresh" content="3">
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body {
-                font-family: 'Segoe UI', Arial, sans-serif;
-                background: transparent;
-                color: white;
-                padding: 15px;
-            }
-            .panel {
-                background: rgba(0, 0, 0, 0.75);
-                border-radius: 15px;
-                padding: 20px;
-                margin-bottom: 15px;
-                backdrop-filter: blur(8px);
-            }
-            .viewers-panel {
-                text-align: center;
-            }
-            .big-number {
-                font-size: 48px;
-                font-weight: bold;
-                color: #00ff88;
-                text-shadow: 0 0 20px #00ff88;
-            }
-            .game-name {
-                font-size: 16px;
-                color: #aaa;
-                margin-top: 5px;
-            }
-            .section-title {
-                font-size: 16px;
-                font-weight: bold;
-                margin-bottom: 10px;
-                padding-bottom: 5px;
-                border-bottom: 2px solid;
-            }
-            .chatters-title { border-color: #9b59b6; }
-            .top-title { border-color: #f39c12; }
-            .chatters-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 5px;
-                font-size: 12px;
-            }
-            .chatter-name {
-                padding: 3px 8px;
-                background: rgba(155, 89, 182, 0.3);
-                border-radius: 4px;
-            }
-            .top-item {
-                padding: 6px 0;
-                border-bottom: 1px solid rgba(255,255,255,0.1);
-            }
-            .top-item:last-child { border-bottom: none; }
-            .offline { color: #ff4444; }
-        </style>
-    </head>
-    <body>
-        <div class="panel viewers-panel">
-            <div class="big-number" id="viewers">-</div>
-            <div class="game-name" id="game"></div>
-        </div>
+<html>
+<head>
+    <meta charset="UTF-8">    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: transparent;
+            color: white;
+            padding: 15px;
+        }
+        .panel {
+            background: rgba(0, 0, 0, 0.75);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(8px);
+        }
+        .viewers-panel {
+            text-align: center;
+        }
+        .big-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: #00ff88;
+            text-shadow: 0 0 20px #00ff88;
+        }
+        .game-name {
+            font-size: 16px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid;
+        }
+        .chatters-title { border-color: #9b59b6; }
+        .top-title { border-color: #f39c12; }
+        .chatters-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-size: 12px;
+        }
+        .chatter-name {
+            padding: 3px 8px;
+            background: rgba(155, 89, 182, 0.3);
+            border-radius: 4px;
+        }
+        .top-item {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .top-item:last-child { border-bottom: none; }
+        .offline { color: #ff4444; }
+    </style>
+</head>
+<body>
+    <div class="panel viewers-panel">
+        <div class="big-number" id="viewers">-</div>
+        <div class="game-name" id="game"></div>
+    </div>
 
-        <div class="panel">
-            <div class="section-title chatters-title">💬 В чате (<span id="count">0</span>)</div>
-            <div class="chatters-grid" id="chatters"></div>
-        </div>
+    <div class="panel">
+        <div class="section-title chatters-title">💬 В чате (<span id="count">0</span>)</div>
+        <div class="chatters-grid" id="chatters"></div>
+    </div>
 
-
-
-        <script>
+    <script>
+        
+        function updateData() {
             fetch('obs_data.json?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
-                    // Viewers
+                    
                     const vEl = document.getElementById('viewers');
                     const gEl = document.getElementById('game');
 
@@ -1045,7 +1048,7 @@ class TwitchChatLogger:
                         gEl.textContent = '';
                     }
 
-                    // Chatters
+                    
                     document.getElementById('count').textContent = data.chatters_count;
                     const cEl = document.getElementById('chatters');
 
@@ -1056,17 +1059,24 @@ class TwitchChatLogger:
                         cEl.innerHTML = '<div style="color:#666">Пусто</div>';
                     }
 
-                    // Top viewers
+                    
                     const tEl = document.getElementById('top');
-                    if (data.top_viewers && data.top_viewers.length > 0) {
-                        tEl.innerHTML = data.top_viewers.slice(0, 5).map((item, i) => 
+                    if (tEl && data.top_viewers && data.top_viewers.length > 0) {
+                        tEl.innerHTML = data.top_viewers.slice(0, 5).map((item, i) =>
                             '<div class="top-item"><b>' + (i+1) + '. ' + item.name + '</b> <small style="color:#888">(' + item.time + ')</small></div>'
                         ).join('');
                     }
-                });
-        </script>
-    </body>
-    </html>'''
+                })
+                .catch(err => console.error('Ошибка загрузки:', err));
+        }
+
+        
+        updateData();
+        
+        setInterval(updateData, 10000);
+    </script>
+</body>
+</html>'''
 
         (self.obs_dir / "viewers.html").write_text(viewers_html, encoding="utf-8")
         (self.obs_dir / "chatters.html").write_text(chatters_html, encoding="utf-8")
@@ -1078,7 +1088,7 @@ class TwitchChatLogger:
         try:
             data = load_chatters_data()
             sorted_data = sorted(
-                data.items(),
+                (item for item in data.items() if not should_ignore_user(item[0])),
                 key=lambda x: parse_duration(x[1].get("total_watch_time", "0:00:00")),
                 reverse=True
             )[:10]
@@ -1097,7 +1107,7 @@ class TwitchChatLogger:
                 "title": stream_info.get("title", "") if stream_info else "",
                 "is_live": stream_info.get("is_live", False) if stream_info else False,
                 "chatters_count": len(chatters) if chatters else 0,
-                "chatters": sorted(list(chatters)) if chatters else [],
+                "chatters": sorted([user for user in chatters if not should_ignore_user(user)]) if chatters else [],
                 "top_viewers": top_viewers,
                 "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
@@ -1307,7 +1317,8 @@ class TwitchChatLogger:
         if self.is_monitoring:
             self.stop_monitoring()
         save_settings({
-            "channel": self.channel_entry.get().strip()
+            "channel": self.channel_entry.get().strip(),
+            "ignored_bots": list(BOTS_TO_IGNORE)
         })
         self.root.destroy()
 
