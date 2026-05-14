@@ -26,7 +26,7 @@ ACCESS_TOKEN = None
 REDIRECT_URI = "http://localhost:3000"
 SCOPE = "moderator:read:chatters"
 BOTS_TO_IGNORE = {'moobot', 'nightbot', 'streamelements', 'streamlabs', 'wizebot'}
-version = "0.5.5"
+version = "0.6"
 
 
 def should_ignore_user(username: str) -> bool:
@@ -186,6 +186,7 @@ def redirect_stdout_stderr_to_file(log_path):
             pass
         sys.stdout = orig_stdout
         sys.stderr = orig_stderr
+
 
 class TwitchChatLogger:
     def __init__(self, root):
@@ -347,7 +348,6 @@ class TwitchChatLogger:
         )
         self.open_browser_btn.pack(pady=(10, 5))
 
-
         self.stats_btn = tk.Button(
             self.root,
             text="📊 Показать статистику",
@@ -440,7 +440,11 @@ class TwitchChatLogger:
 
     def restore_fields(self):
         settings = load_settings()
+        self.channel_entry.delete(0, tk.END)  # Очистка перед вставкой
         self.channel_entry.insert(0, settings.get("channel", ""))
+        if "twitch_user_token" in settings:
+            self.access_token = settings["twitch_user_token"]
+            self.status_label.config(text="✅ Авторизован (из памяти)", fg="green")
 
     def log(self, message):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -494,6 +498,11 @@ class TwitchChatLogger:
         if token:
             self.access_token = token.strip()
             self.status_label.config(text="✅ Авторизован", fg="green")
+            settings = load_settings()
+            settings["twitch_user_token"] = self.access_token
+            save_settings(settings)
+            messagebox.showinfo("Успех", "Токен сохранён в settings.json!")
+            self.status_label.config(text="✅ Авторизован", fg="green")
             messagebox.showinfo("Успех", "Токен сохранён!")
 
     def check_channel(self):
@@ -537,6 +546,7 @@ class TwitchChatLogger:
         if not self.broadcaster_id or not self.access_token:
             messagebox.showwarning("Ошибка", "Сначала авторизуйтесь и проверьте канал!")
             return
+        self.log_file = settings_dir / "monitoring.log"
         self.is_monitoring = True
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
@@ -577,7 +587,6 @@ class TwitchChatLogger:
         }
 
         try:
-            time.sleep(10)
             response = requests.get(url, headers=headers, params=params)
             response.raise_for_status()
             data = response.json()
@@ -1029,12 +1038,12 @@ class TwitchChatLogger:
     </div>
 
     <script>
-        
+
         function updateData() {
             fetch('obs_data.json?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
-                    
+
                     const vEl = document.getElementById('viewers');
                     const gEl = document.getElementById('game');
 
@@ -1048,7 +1057,7 @@ class TwitchChatLogger:
                         gEl.textContent = '';
                     }
 
-                    
+
                     document.getElementById('count').textContent = data.chatters_count;
                     const cEl = document.getElementById('chatters');
 
@@ -1059,7 +1068,7 @@ class TwitchChatLogger:
                         cEl.innerHTML = '<div style="color:#666">Пусто</div>';
                     }
 
-                    
+
                     const tEl = document.getElementById('top');
                     if (tEl && data.top_viewers && data.top_viewers.length > 0) {
                         tEl.innerHTML = data.top_viewers.slice(0, 5).map((item, i) =>
@@ -1070,9 +1079,9 @@ class TwitchChatLogger:
                 .catch(err => console.error('Ошибка загрузки:', err));
         }
 
-        
+
         updateData();
-        
+
         setInterval(updateData, 10000);
     </script>
 </body>
@@ -1143,7 +1152,6 @@ class TwitchChatLogger:
                         update_chatter(user, 'exit', entry_time)
                         del self.user_entry_times[user]
                         self.log(f"🔴 [ВЫХОД] Пользователь '{user}' вышел из чата")
-                update_all_online_users(current_chatters)
                 self.previous_chatters = set(current_chatters)
                 time.sleep(10)
             except Exception as e:
@@ -1300,11 +1308,16 @@ class TwitchChatLogger:
             padx=10,
             pady=3
         )
+
+        def close_stats():
+            stats_window.destroy()
+
         export_btn.pack(side=tk.LEFT, padx=5)
         close_btn = tk.Button(
+
             btn_frame,
             text="❌ Закрыть",
-            command=self.web_server_files,
+            command=close_stats,
             bg="#e74c3c",
             fg="white",
             font=("Arial", 9),
@@ -1316,10 +1329,12 @@ class TwitchChatLogger:
     def on_closing(self):
         if self.is_monitoring:
             self.stop_monitoring()
-        save_settings({
-            "channel": self.channel_entry.get().strip(),
-            "ignored_bots": list(BOTS_TO_IGNORE)
-        })
+        settings = load_settings()
+        settings["channel"] = self.channel_entry.get().strip()
+        settings["ignored_bots"] = list(BOTS_TO_IGNORE)
+        if self.access_token:
+            settings["twitch_user_token"] = self.access_token
+        save_settings(settings)
         self.root.destroy()
 
 
@@ -1344,8 +1359,10 @@ def main():
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
 
+
 if __name__ == "__main__":
     import tkinter.ttk as tk_ttk
 
     tk.ttk = tk_ttk
     main()
+    
